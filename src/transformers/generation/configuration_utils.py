@@ -80,6 +80,7 @@ class GenerationMode(ExplicitEnum):
 
     # Non-beam methods
     CONTRASTIVE_SEARCH = "contrastive_search"
+    MULTIDIM_SEARCH = "multidim_search"
     GREEDY_SEARCH = "greedy_search"
     SAMPLE = "sample"
     ASSISTED_GENERATION = "assisted_generation"
@@ -386,6 +387,7 @@ class GenerationConfig(PushToHubMixin):
         self.num_beam_groups = kwargs.pop("num_beam_groups", 1)
         self.penalty_alpha = kwargs.pop("penalty_alpha", None)
         self.dola_layers = kwargs.pop("dola_layers", None)
+        self.hidden_states_file = kwargs.pop("hidden_states_file", None)
 
         # Parameters that control the cache
         self.use_cache = kwargs.pop("use_cache", True)
@@ -518,6 +520,14 @@ class GenerationConfig(PushToHubMixin):
         elif self.num_beams == 1:
             if self.do_sample is False:
                 if (
+                    self.top_k is not None
+                    and self.top_k > 1
+                    and self.penalty_alpha is not None
+                    and self.penalty_alpha > 0
+                    and self.hidden_states_file is not None
+                ):
+                    generation_mode = GenerationMode.MULTIDIM_SEARCH
+                elif (
                     self.top_k is not None
                     and self.top_k > 1
                     and self.penalty_alpha is not None
