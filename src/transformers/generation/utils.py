@@ -3233,7 +3233,7 @@ class GenerationMixin:
             raise ValueError("hidden_states_file must be provided for contrastive search with external hidden states")
 
         if not first_turn:
-            hidden_states_log = torch.load(hidden_states_file).to(device)
+            hidden_states_log = torch.load(hidden_states_file)
 
         if first_turn:
             # Create cosine_matrix_mask based on the attention_mask
@@ -3528,7 +3528,7 @@ class GenerationMixin:
                 streamer.end()
 
             # 保存最后的隐藏状态
-            torch.save(last_hidden_states.unsqueeze(0), hidden_states_file)
+            torch.save([last_hidden_states], hidden_states_file)
 
             if return_dict_in_generate:
                 # Contrastive search works by forward looking at the next token, so we need to exclude it from
@@ -3577,8 +3577,9 @@ class GenerationMixin:
             # 修改cosine_matrix_mask
             # cosine_matrix_mask = torch.ones_like(input_ids, dtype=torch.long)
             # 取出来log中最新的隐藏状态，便于生成mask
-            print(f"hidden_states_log: {hidden_states_log.shape}")
-            reference_hidden_states = hidden_states_log.mean(dim=-1).squeeze(0)
+            # print(f"hidden_states_log: {hidden_states_log[0].shape}")
+            reference_hidden_states = torch.stack([t.mean(dim=-1) for t in hidden_states_log], dim=0)
+            # reference_hidden_states = hidden_states_log.mean(dim=-1).squeeze(0)
             print(f"reference_hidden_states: {reference_hidden_states.shape}")
             cosine_matrix_mask = torch.ones_like(reference_hidden_states, dtype=torch.long)
             if self.config.is_encoder_decoder:
@@ -3886,12 +3887,13 @@ class GenerationMixin:
             if hidden_states_file is not None:
                 try:
                     existing_hidden_states = torch.load(hidden_states_file)
-                    print(f"existing_hidden_states: {existing_hidden_states.shape}")
-                    print(f"last_hidden_states.unsqueeze(0): {last_hidden_states.unsqueeze(0).shape}")
-                    updated_hidden_states = torch.cat((existing_hidden_states, last_hidden_states.unsqueeze(0)), dim=0)
+                    # print(f"existing_hidden_states: {existing_hidden_states[0].shape}")
+                    # print(f"last_hidden_states.unsqueeze(0): {last_hidden_states.unsqueeze(0).shape}")
+                    existing_hidden_states.append(last_hidden_states)
+                    # updated_hidden_states = torch.cat((existing_hidden_states, last_hidden_states.unsqueeze(0)), dim=0)
                 except FileNotFoundError:
-                    updated_hidden_states = last_hidden_states.unsqueeze(0)
-                torch.save(updated_hidden_states, hidden_states_file)
+                    existing_hidden_states = [last_hidden_states]
+                torch.save(existing_hidden_states, hidden_states_file)
 
             if return_dict_in_generate:
                 # Contrastive search works by forward looking at the next token, so we need to exclude it from
